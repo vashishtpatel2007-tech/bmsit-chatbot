@@ -33,15 +33,18 @@ try:
 except Exception as e:
     raise RuntimeError(f"❌ Failed to configure Gemini: {e}")
 
-app = FastAPI()
+# --- PASTE THIS RIGHT AFTER app = FastAPI() ---
+from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # 👈 This allows ANY website (Vercel, Localhost) to talk to it
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ----------------------------------------------
+
 
 # --- PERSONALITIES & INSTRUCTIONS ---
 PROMPTS = {
