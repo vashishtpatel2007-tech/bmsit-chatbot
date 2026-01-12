@@ -7,7 +7,7 @@ import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp,
 import { auth, db } from "./firebase";
 
 // --- CONFIG ---
-const API_URL = "https://bmsit-backend-9o1e.onrender.com"; 
+const API_URL = "https://bmsit-backend-9o1e.onrender.com/chat";
 const MODES = ["Study Buddy", "The Professor", "The Bro", "ELI5"];
 const YEARS = ["1", "2", "3", "4"];
 
