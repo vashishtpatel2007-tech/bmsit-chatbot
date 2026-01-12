@@ -11,6 +11,29 @@ const API_URL = "https://bmsit-backend-9o1e.onrender.com/chat";
 const MODES = ["Study Buddy", "The Professor", "The Bro", "ELI5"];
 const YEARS = ["1", "2", "3", "4"];
 
+// --- HELPER: Detect URLs and make them clickable ---
+const renderMessageWithLinks = (text) => {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a 
+          key={index} 
+          href={part} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-blue-400 hover:text-blue-300 underline break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 function App() {
   // --- STATE ---
   const [user, setUser] = useState(null);
@@ -29,7 +52,6 @@ function App() {
   const messagesEndRef = useRef(null);
 
   // --- NEW: PERSISTENT YEAR ---
-  // Checks browser memory first. If empty, defaults to "1".
   const [year, setYear] = useState(localStorage.getItem("bmsit_year") || "1");
 
   // Login Form
@@ -311,7 +333,10 @@ function App() {
                     <Bot size={14} /> BMSIT Assistant
                   </div>
                 )}
-                <div className="leading-relaxed whitespace-pre-wrap">{msg.content}</div>
+                <div className="leading-relaxed whitespace-pre-wrap">
+                  {/* THIS IS THE FIX: RENDERS LINKS AS CLICKABLE */}
+                  {renderMessageWithLinks(msg.content)}
+                </div>
               </div>
             </motion.div>
           ))}
