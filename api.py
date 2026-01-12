@@ -1,8 +1,9 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
 
 # --- IMPORTS ---
 from pinecone import Pinecone
@@ -16,7 +17,7 @@ from llama_index.core.vector_stores import MetadataFilters, ExactMatchFilter
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-INDEX_NAME = "bmsit-chatbot"
+INDEX_NAME = os.getenv("INDEX_NAME", "bmsit-chatbot") # Added fallback just in case
 
 if not GOOGLE_API_KEY or not PINECONE_API_KEY:
     raise ValueError("❌ CRITICAL ERROR: API Keys missing from .env file!")
@@ -33,18 +34,17 @@ try:
 except Exception as e:
     raise RuntimeError(f"❌ Failed to configure Gemini: {e}")
 
-# --- PASTE THIS RIGHT AFTER app = FastAPI() ---
-from fastapi.middleware.cors import CORSMiddleware
+# 3. INITIALIZE APP (This was missing!)
+app = FastAPI()
 
+# 4. CORS FIX (Allows Vercel to talk to Render)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 👈 This allows ANY website (Vercel, Localhost) to talk to it
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# ----------------------------------------------
-
 
 # --- PERSONALITIES & INSTRUCTIONS ---
 PROMPTS = {
@@ -83,16 +83,16 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
     try:
-        # 3. SELECT PERSONA
+        # 5. SELECT PERSONA
         system_instruction = PROMPTS.get(request.mode, PROMPTS["Study Buddy"])
 
-        # 4. CONNECT TO DATABASE
+        # 6. CONNECT TO DATABASE
         pc = Pinecone(api_key=PINECONE_API_KEY)
         pinecone_index = pc.Index(INDEX_NAME)
         vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
         index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
 
-        # 5. CREATE CUSTOM PROMPT
+        # 7. CREATE CUSTOM PROMPT
         template_str = (
             f"{system_instruction}\n\n"
             "Context from notes/drive:\n"
@@ -104,10 +104,10 @@ def chat_endpoint(request: ChatRequest):
         )
         qa_template = PromptTemplate(template_str)
 
-        # 6. FILTER BY YEAR
+        # 8. FILTER BY YEAR
         filters = MetadataFilters(filters=[ExactMatchFilter(key="year", value=request.year)])
         
-        # 7. QUERY
+        # 9. QUERY
         query_engine = index.as_query_engine(
             similarity_top_k=5, 
             filters=filters,
@@ -128,5 +128,4 @@ def home():
     return {"status": "Active", "message": "BMSIT Chatbot Brain is Online"}
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
