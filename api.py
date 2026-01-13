@@ -17,27 +17,37 @@ from llama_index.core.vector_stores import MetadataFilters, ExactMatchFilter
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-INDEX_NAME = os.getenv("INDEX_NAME", "bmsit-chatbot") # Added fallback just in case
+INDEX_NAME = os.getenv("INDEX_NAME", "bmsit-chatbot")
 
 if not GOOGLE_API_KEY or not PINECONE_API_KEY:
     raise ValueError("❌ CRITICAL ERROR: API Keys missing from .env file!")
 
-# 2. CONFIGURE AI (Globally)
-print("⚙️ Setting up Gemini 2.0 Flash...")
+# ==============================================================================
+# 🗄️ MASTER FOLDER DATABASE (Your Real Links)
+# ------------------------------------------------------------------------------
+# The AI uses these to give the user the "whole folder" when they ask for files.
+# ==============================================================================
+DATABASE = {
+    "1": "https://drive.google.com/drive/folders/1Yv-tfstUnQytvhvdLP02j6IDiolovIWI?usp=drive_link",
+    "2": "https://drive.google.com/drive/folders/1gGPWHjZSF0Z22fus_yRrX_aq3zKws5Bp?usp=drive_link",
+    "3": "https://drive.google.com/drive/folders/1fIZRxNrGmz5BwzNjbCsLdHfOHRK9MU1e?usp=drive_link",
+    "4": "https://drive.google.com/drive/folders/17Ga5lrRQ-d8aLEOhZ24qZ7vWL8bXUpY1?usp=drive_link"
+}
+
+# 2. CONFIGURE AI (Gemini 2.0 Flash for Speed & Intelligence)
+print("⚙️ Setting up Gemini 2.0...")
 try:
     embed_model = GoogleGenAIEmbedding(model="models/text-embedding-004", api_key=GOOGLE_API_KEY)
     llm = GoogleGenAI(model="models/gemini-2.0-flash", api_key=GOOGLE_API_KEY)
     
     Settings.embed_model = embed_model
     Settings.llm = llm
-    print("✅ Gemini 2.0 Configured Successfully.")
 except Exception as e:
     raise RuntimeError(f"❌ Failed to configure Gemini: {e}")
 
-# 3. INITIALIZE APP (This was missing!)
+# 3. INITIALIZE APP
 app = FastAPI()
 
-# 4. CORS FIX (Allows Vercel to talk to Render)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -46,68 +56,92 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- PERSONALITIES & INSTRUCTIONS ---
-PROMPTS = {
+# ==============================================================================
+# ✨ PERSONA RULES (MAXIMUM VIBES)
+# ------------------------------------------------------------------------------
+# These rules ensure the user leaves the chat feeling great.
+# ==============================================================================
+PERSONA_RULES = {
     "Study Buddy": (
-        "You are a helpful student peer. "
-        "1. TIMETABLES: NEVER use Markdown tables or grids (like | Column |). They look broken. "
-        "   - Instead, if the user asks for the full timetable, JUST give the [OFFICIAL DOCUMENT LINK]. "
-        "   - If they ask for a specific day, use a simple list: 'Monday: 9am - Math'. "
-        "2. VISUALS: Use Mermaid.js (graph TD) ONLY for concepts/processes, NOT for schedules. "
-        "3. LINKS: Always prioritize the direct link for documents."
+        "You are 'Alex', an energetic, super-supportive BMSIT senior. "
+        "VIBE: Positive, encouraging, high energy! Use emojis like 🚀, ✨, 📚. "
+        "GOAL: Make the student feel capable and less stressed. "
+        "RULE: If the answer is complex, break it down and say 'You got this!'. "
+        "If asked for a file, say 'I got you covered! Here's the stash:'"
     ),
     "The Professor": (
-        "You are a strict academic Professor. "
-        "1. FORMATTING: Do NOT generate ASCII/Markdown tables. They are unprofessional. "
-        "2. RESPONSE: For schedules, provide the [OFFICIAL DOCUMENT LINK] immediately. "
-        "3. DETAILS: If specific class details are requested, state them in a clear sentence or bullet list."
+        "You are Professor Sharma, a distinguished academic. "
+        "VIBE: Formal, precise, polite, and respectful. "
+        "GOAL: Provide accurate, zero-fluff information efficiently. "
+        "RULE: Start answers with 'The requested information is as follows:'. "
+        "Do not use slang. Maintain academic integrity."
     ),
     "The Bro": (
-        "You are a chill friend. "
-        "1. NO TABLES: Don't make those ugly grid tables. "
-        "2. RESPONSE: If they want the timetable, just say 'Here is the link' and drop the [OFFICIAL DOCUMENT LINK]. "
-        "3. SPECIFICS: Only list specific classes if they ask 'When is Physics?'."
+        "You are 'Sam', the chillest guy on campus. "
+        "VIBE: Casual, short, uses slang (fam, easy scene, bet, dw). "
+        "GOAL: Give the answer instantly without wasting time. "
+        "RULE: Treat the user like your best friend. If they want a file, say 'Say less, here's the link:'"
     ),
     "ELI5": (
-        "Explain simply. "
-        "Never draw complex tables. Give the link if they need the schedule."
+        "You are a patient Tutor. "
+        "VIBE: Gentle, slow, and clear. "
+        "GOAL: Explain hard engineering concepts as if the user is 10 years old. "
+        "RULE: Use analogies (like comparing electricity to water). No big words."
     )
 }
 
 class ChatRequest(BaseModel):
     message: str
-    year: str
+    year: str = "1"
     mode: str = "Study Buddy"
     token: str = None
 
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
     try:
-        # 5. SELECT PERSONA
-        system_instruction = PROMPTS.get(request.mode, PROMPTS["Study Buddy"])
+        # 1. GET THE MASTER LINK
+        selected_year = str(request.year)
+        if selected_year not in DATABASE: selected_year = "1"
+        master_folder_link = DATABASE[selected_year]
 
-        # 6. CONNECT TO DATABASE
+        # 2. CONSTRUCT SYSTEM PROMPT
+        persona_instruction = PERSONA_RULES.get(request.mode, PERSONA_RULES["Study Buddy"])
+        
+        base_instruction = (
+            f"{persona_instruction}\n\n"
+            f"You are assisting a Year {selected_year} student.\n"
+            f"OFFICIAL DRIVE LINK: {master_folder_link}\n\n"
+            "🧠 LOGIC PROTOCOL:\n"
+            "1. FILE REQUESTS (e.g., 'timetable', 'syllabus', 'notes', 'pdf'):\n"
+            "   - You do NOT have direct file links. You ONLY have the Master Folder.\n"
+            "   - Response: Give the {master_folder_link} and say something matching your persona (e.g., 'Everything you need is in here!').\n"
+            "2. KNOWLEDGE QUESTIONS (e.g., 'when is exams?', 'explain unit 1'):\n"
+            "   - Search the 'Context from uploaded files' below.\n"
+            "   - Answer the question directly using that information.\n"
+            "   - Do NOT send the link unless asked."
+        )
+
+        # 3. CONNECT TO BRAIN
         pc = Pinecone(api_key=PINECONE_API_KEY)
         pinecone_index = pc.Index(INDEX_NAME)
         vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
         index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
 
-        # 7. CREATE CUSTOM PROMPT
+        # 4. CREATE PROMPT
         template_str = (
-            f"{system_instruction}\n\n"
-            "Context from notes/drive:\n"
+            f"{base_instruction}\n\n"
+            "CONTEXT FROM YOUR BRAIN:\n"
             "---------------------\n"
             "{context_str}\n"
             "---------------------\n"
-            "Query: {query_str}\n"
-            "Answer: "
+            "USER SAYS: {query_str}\n"
+            "YOUR REPLY:"
         )
         qa_template = PromptTemplate(template_str)
 
-        # 8. FILTER BY YEAR
+        # 5. QUERY
         filters = MetadataFilters(filters=[ExactMatchFilter(key="year", value=request.year)])
         
-        # 9. QUERY
         query_engine = index.as_query_engine(
             similarity_top_k=5, 
             filters=filters,
@@ -119,13 +153,11 @@ def chat_endpoint(request: ChatRequest):
 
     except Exception as e:
         print(f"❌ CRASH LOG: {e}")
-        if "429" in str(e):
-            return {"response": "I'm thinking too fast! Please wait 30 seconds. (Speed Limit Reached)"}
-        return {"response": "I'm having trouble accessing my brain. Check the terminal for the error."}
+        return {"response": "My brain is having a hiccup! Please try again in a sec. 🤖"}
 
 @app.get("/")
 def home():
-    return {"status": "Active", "message": "BMSIT Chatbot Brain is Online"}
+    return {"status": "Active", "message": "BMSIT Vibe Check Passed ✅"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
