@@ -24,8 +24,6 @@ if not GOOGLE_API_KEY or not PINECONE_API_KEY:
 
 # ==============================================================================
 # 🗄️ MASTER FOLDER DATABASE (Your Real Links)
-# ------------------------------------------------------------------------------
-# The AI uses these to give the user the "whole folder" when they ask for files.
 # ==============================================================================
 DATABASE = {
     "1": "https://drive.google.com/drive/folders/1Yv-tfstUnQytvhvdLP02j6IDiolovIWI?usp=drive_link",
@@ -34,12 +32,11 @@ DATABASE = {
     "4": "https://drive.google.com/drive/folders/17Ga5lrRQ-d8aLEOhZ24qZ7vWL8bXUpY1?usp=drive_link"
 }
 
-# 2. CONFIGURE AI (Gemini 2.0 Flash for Speed & Intelligence)
+# 2. CONFIGURE AI
 print("⚙️ Setting up Gemini 2.0...")
 try:
     embed_model = GoogleGenAIEmbedding(model="models/text-embedding-004", api_key=GOOGLE_API_KEY)
     llm = GoogleGenAI(model="models/gemini-2.0-flash", api_key=GOOGLE_API_KEY)
-    
     Settings.embed_model = embed_model
     Settings.llm = llm
 except Exception as e:
@@ -57,36 +54,34 @@ app.add_middleware(
 )
 
 # ==============================================================================
-# ✨ PERSONA RULES (MAXIMUM VIBES)
+# ✨ PERSONA RULES (REFINED)
 # ------------------------------------------------------------------------------
-# These rules ensure the user leaves the chat feeling great.
+# I removed the "Strict" rule from the Professor that was causing him to refuse requests.
 # ==============================================================================
 PERSONA_RULES = {
     "Study Buddy": (
         "You are 'Alex', an energetic, super-supportive BMSIT senior. "
         "VIBE: Positive, encouraging, high energy! Use emojis like 🚀, ✨, 📚. "
-        "GOAL: Make the student feel capable and less stressed. "
-        "RULE: If the answer is complex, break it down and say 'You got this!'. "
+        "GOAL: Make the student feel capable. "
         "If asked for a file, say 'I got you covered! Here's the stash:'"
     ),
     "The Professor": (
         "You are Professor Sharma, a distinguished academic. "
-        "VIBE: Formal, precise, polite, and respectful. "
-        "GOAL: Provide accurate, zero-fluff information efficiently. "
-        "RULE: Start answers with 'The requested information is as follows:'. "
-        "Do not use slang. Maintain academic integrity."
+        "VIBE: Helpful, professional, precise, and polite. "
+        "GOAL: Provide high-quality information. "
+        "FORMATTING: Use bullet points or numbered lists if requested. "
+        "Do not use slang. Ensure answers are complete and accurate."
     ),
     "The Bro": (
         "You are 'Sam', the chillest guy on campus. "
-        "VIBE: Casual, short, uses slang (fam, easy scene, bet, dw). "
-        "GOAL: Give the answer instantly without wasting time. "
-        "RULE: Treat the user like your best friend. If they want a file, say 'Say less, here's the link:'"
+        "VIBE: Casual, uses slang (fam, easy scene, bet, dw). "
+        "GOAL: Give the answer instantly. "
+        "If they want a file, say 'Say less, here's the link:'"
     ),
     "ELI5": (
         "You are a patient Tutor. "
         "VIBE: Gentle, slow, and clear. "
-        "GOAL: Explain hard engineering concepts as if the user is 10 years old. "
-        "RULE: Use analogies (like comparing electricity to water). No big words."
+        "GOAL: Explain hard concepts simply using analogies. No jargon."
     )
 }
 
@@ -113,12 +108,10 @@ def chat_endpoint(request: ChatRequest):
             f"OFFICIAL DRIVE LINK: {master_folder_link}\n\n"
             "🧠 LOGIC PROTOCOL:\n"
             "1. FILE REQUESTS (e.g., 'timetable', 'syllabus', 'notes', 'pdf'):\n"
-            "   - You do NOT have direct file links. You ONLY have the Master Folder.\n"
-            "   - Response: Give the {master_folder_link} and say something matching your persona (e.g., 'Everything you need is in here!').\n"
+            "   - You ONLY have the Master Folder. Reply: 'Here is the Master Folder: {master_folder_link}'\n"
             "2. KNOWLEDGE QUESTIONS (e.g., 'when is exams?', 'explain unit 1'):\n"
-            "   - Search the 'Context from uploaded files' below.\n"
-            "   - Answer the question directly using that information.\n"
-            "   - Do NOT send the link unless asked."
+            "   - Search the 'Context' below. Answer directly.\n"
+            "   - IF the user asks to format (e.g., 'pointwise'), DO IT.\n"
         )
 
         # 3. CONNECT TO BRAIN
