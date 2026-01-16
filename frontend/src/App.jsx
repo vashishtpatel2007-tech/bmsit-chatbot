@@ -165,9 +165,19 @@ function App() {
         createdAt: serverTimestamp()
       });
 
+      // --- MEMORY FIX: ATTACH PREVIOUS CONTEXT ---
+      // We grab the last message (if it exists) and send it hiddenly to the bot
+      // so it knows what "it" or "that" refers to.
+      const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+      let finalPayload = userText;
+      
+      if (lastMsg && lastMsg.role === 'assistant') {
+         finalPayload = `Previous Answer Context: "${lastMsg.content}"\n\nUser Question: ${userText}`;
+      }
+
       const token = await user.getIdToken();
       const response = await axios.post(API_URL, {
-        message: userText,
+        message: finalPayload, // 👈 sending context + question
         year: year, 
         mode: mode,
         token: token
@@ -192,7 +202,6 @@ function App() {
 
   if (authLoading) return <div className="h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
 
-  // LOGIN SCREEN
   if (!user) {
     return (
       <div className="h-screen w-full bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -229,7 +238,6 @@ function App() {
     );
   }
 
-  // APP INTERFACE
   return (
     <div className="flex h-screen w-full bg-black text-white">
       
@@ -244,14 +252,12 @@ function App() {
               <span className="font-semibold">BMSIT AI</span>
             </div>
 
-            {/* NEW CHAT BUTTON */}
             <div className="p-3">
               <button onClick={createNewChat} className="w-full flex items-center gap-2 bg-[#1e1e1e] hover:bg-[#2a2a2a] text-white p-3 rounded-lg transition-colors border border-[#333]">
                 <Plus size={16} /> <span className="text-sm font-medium">New Chat</span>
               </button>
             </div>
 
-            {/* HISTORY LIST */}
             <div className="flex-1 p-3 overflow-y-auto space-y-1">
               <div className="text-xs font-bold text-gray-500 mb-2 px-2 pt-2">RECENT CHATS</div>
               {chats.map((chat) => (
@@ -271,7 +277,6 @@ function App() {
               ))}
             </div>
 
-            {/* USER PROFILE */}
             <div className="p-4 border-t border-[#222]">
               <div className="flex items-center gap-3 p-3 bg-[#161616] rounded-xl border border-[#222]">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold">
@@ -291,14 +296,12 @@ function App() {
 
       {/* MAIN CHAT AREA */}
       <div className="flex-1 flex flex-col h-full relative">
-        {/* TOP BAR */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-[#222]">
           <div className="flex items-center gap-4">
             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-[#1f1f1f] rounded-lg text-gray-400 hover:text-white transition-colors">
               <Menu size={20} />
             </button>
             
-            {/* MODE SELECTOR */}
             <div className="flex items-center gap-2 bg-[#1e1e1e] px-3 py-1.5 rounded-full border border-[#333]">
               <Sparkles size={14} className="text-yellow-400" />
               <select value={mode} onChange={(e) => setMode(e.target.value)} className="bg-transparent text-sm font-medium outline-none cursor-pointer text-gray-200">
@@ -306,7 +309,6 @@ function App() {
               </select>
             </div>
 
-            {/* --- SAVED YEAR SELECTOR --- */}
             <div className="flex items-center gap-2 bg-[#1e1e1e] px-3 py-1.5 rounded-full border border-[#333]">
               <span className="text-xs text-blue-400 font-bold">YEAR</span>
               <select value={year} onChange={(e) => setYear(e.target.value)} className="bg-transparent text-sm font-medium outline-none cursor-pointer text-gray-200">
@@ -317,7 +319,6 @@ function App() {
           </div>
         </div>
 
-        {/* MESSAGES */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
           {messages.length === 0 && (
              <div className="flex h-full flex-col items-center justify-center text-gray-500 opacity-50">
@@ -334,7 +335,6 @@ function App() {
                   </div>
                 )}
                 <div className="leading-relaxed whitespace-pre-wrap">
-                  {/* THIS IS THE FIX: RENDERS LINKS AS CLICKABLE */}
                   {renderMessageWithLinks(msg.content)}
                 </div>
               </div>
@@ -348,7 +348,6 @@ function App() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT */}
         <div className="p-6">
           <div className="max-w-4xl mx-auto bg-[#1e1e1e] rounded-full border border-[#333] flex items-center px-4 py-3 shadow-2xl focus-within:border-blue-600 transition-colors">
             <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Ask Year ${year} question...`} className="flex-1 bg-transparent outline-none text-white placeholder-gray-500 ml-2" />
