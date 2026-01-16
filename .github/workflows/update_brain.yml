@@ -1,0 +1,42 @@
+name: Auto-Update Brain
+
+on:
+  schedule:
+    # Runs at 6:00 AM and 6:00 PM UTC every day
+    - cron: '0 6,18 * * *'
+  # Allows you to click a "Run Now" button manually for testing
+  workflow_dispatch:
+
+jobs:
+  refresh-data:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Get your code
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # 2. Install Python
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    # 3. Install Libraries
+    - name: Install Dependencies
+      run: |
+        pip install -r requirements.txt
+
+    # 4. RECREATE credentials.json (The Magic Trick ✨)
+    - name: Create Credentials File
+      run: echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > credentials.json
+
+    # 5. Run your Script
+    - name: Run Update Script
+      env:
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+        LLAMA_CLOUD_API_KEY: ${{ secrets.LLAMA_CLOUD_API_KEY }}
+        INDEX_NAME: ${{ secrets.INDEX_NAME }}
+      run: |
+        python update_brain.py
