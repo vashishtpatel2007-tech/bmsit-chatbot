@@ -19,15 +19,15 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("INDEX_NAME", "bmsit-chatbot")
 
-# 2. CONFIGURE AI (EXPLICIT PURGE)
-print("🚀 [STATUS] FORCING EMBEDDING-001 AND RESTORING MODES")
+# 2. CONFIGURE AI (THE TOTAL PURGE)
+print("🚀 [STATUS] FORCING EMBEDDING-001 TO KILL THE 404 GHOST")
 
 try:
-    # Stable model to bypass billing/version issues
+    # Use the stable model strictly to bypass Google billing/version drama
     embed_model = GoogleGenAIEmbedding(model="models/embedding-001", api_key=GOOGLE_API_KEY)
     llm = GoogleGenAI(model="models/gemini-1.5-flash", api_key=GOOGLE_API_KEY)
     
-    # Global Defaults
+    # Force into Global Settings
     Settings.embed_model = embed_model
     Settings.llm = llm
 except Exception as e:
@@ -37,7 +37,6 @@ except Exception as e:
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# --- DATA ---
 DATABASE = {
     "1": "https://drive.google.com/drive/folders/1Yv-tfstUnQytvhvdLP02j6IDiolovIWI?usp=drive_link",
     "2": "https://drive.google.com/drive/folders/1gGPWHjZSF0Z22fus_yRrX_aq3zKws5Bp?usp=drive_link",
@@ -45,8 +44,8 @@ DATABASE = {
     "4": "https://drive.google.com/drive/folders/17Ga5lrRQ-d8aLEOhZ24qZ7vWL8bXUpY1?usp=drive_link"
 }
 
-# 🎭 STUDY MODES (RESTORED)
-PERSONA_RULES = {
+# 🎭 PERSONAS (RESTORED)
+PERSONAS = {
     "Study Buddy": "You are 'Alex', an energetic BMSIT senior. VIBE: Positive, supportive, uses emojis. 🚀",
     "The Professor": "You are Professor Sharma. VIBE: Formal, academic, precise. No slang.",
     "The Bro": "You are 'Sam', the campus legend. VIBE: Casual, chill, uses slang (fam, bet, dw). 🕶️",
@@ -61,18 +60,17 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
     try:
-        print(f"📩 Mode: {request.mode} | Year: {request.year} | Msg: {request.message}")
+        # LOGGING
+        print(f"📩 Processing: {request.message} (Mode: {request.mode}, Year: {request.year})")
         
         year = str(request.year) if str(request.year) in DATABASE else "1"
         drive_link = DATABASE[year]
-        persona = PERSONA_RULES.get(request.mode, PERSONA_RULES["Study Buddy"])
+        persona_rule = PERSONAS.get(request.mode, PERSONAS["Study Buddy"])
         
-        # System Prompt construction
         system_prompt = (
-            f"{persona}\n\n"
-            f"You are helping a Year {year} student at BMSIT.\n"
+            f"{persona_rule}\n\n"
             f"RESOURCES DRIVE: {drive_link}\n"
-            "If they ask for files/notes, give them the link. Otherwise, answer from context."
+            "If they ask for files, share the link. Otherwise, answer from your brain."
         )
 
         # 4. CONNECT TO BRAIN
@@ -80,17 +78,17 @@ def chat_endpoint(request: ChatRequest):
         pinecone_index = pc.Index(INDEX_NAME)
         vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
         
-        # Pass embed_model directly to index and engine to block 404 errors
+        # --- THE FIX: Pass embed_model EXPLICITLY to both components ---
         index = VectorStoreIndex.from_vector_store(
             vector_store=vector_store,
-            embed_model=embed_model
+            embed_model=embed_model # <--- Kills the hidden '004' default
         )
 
         query_engine = index.as_query_engine(
             similarity_top_k=5, 
             filters=MetadataFilters(filters=[ExactMatchFilter(key="year", value=year)]),
             system_prompt=system_prompt,
-            embed_model=embed_model 
+            embed_model=embed_model # <--- Forces search to stay on '001'
         )
         
         response = query_engine.query(request.message)
@@ -98,11 +96,11 @@ def chat_endpoint(request: ChatRequest):
 
     except Exception as e:
         print(f"❌ CHAT CRASH: {e}")
-        return {"response": "My brain is having a hiccup! Please try again. 🤖"}
+        return {"response": "System glitch! Try again in a sec. 🤖"}
 
 @app.get("/")
 def home():
-    return {"status": "Online", "message": "ALL MODES ACTIVE ✅"}
+    return {"status": "Online", "message": "BMSIT CHATBOT STABLE ✅"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=10000)
