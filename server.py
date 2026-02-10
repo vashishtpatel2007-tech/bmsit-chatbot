@@ -4,8 +4,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
-import firebase_admin
-from firebase_admin import credentials, firestore
 
 # --- LlamaIndex Imports ---
 from pinecone import Pinecone
@@ -25,52 +23,25 @@ INDEX_NAME = os.getenv("INDEX_NAME", "bmsit-chatbot")
 print("🚀 [CRITICAL UPDATE] FORCING MODELS/EMBEDDING-001 INTO ALL ENGINES")
 
 try:
-    # We define this strictly to avoid the 404 error
+    # We define the stable model strictly here
     embed_model = GoogleGenAIEmbedding(model="models/embedding-001", api_key=GOOGLE_API_KEY)
     llm = GoogleGenAI(model="models/gemini-2.0-flash", api_key=GOOGLE_API_KEY)
     
-    # Global settings as backup
+    # Force into Global Settings
     Settings.embed_model = embed_model
     Settings.llm = llm
 except Exception as e:
     print(f"❌ AI CONFIG ERROR: {e}")
 
-# 3. INITIALIZE FIREBASE (Safety-First Mode)
-if not firebase_admin._apps:
-    try:
-        # Check if file exists to prevent the 'No such file' crash
-        if os.path.exists("firebase_key.json"):
-            cred = credentials.Certificate("firebase_key.json")
-            firebase_admin.initialize_app(cred)
-            print("🔥 Firebase Initialized Successfully")
-        else:
-            print("⚠️ firebase_key.json NOT FOUND. Chat logs will not be saved, but bot will work.")
-    except Exception as e:
-        print(f"⚠️ Firebase Warning: {e}")
-
-# 4. INITIALIZE APP
+# 3. INITIALIZE APP
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 DATABASE = {
     "1": "https://drive.google.com/drive/folders/1Yv-tfstUnQytvhvdLP02j6IDiolovIWI?usp=drive_link",
     "2": "https://drive.google.com/drive/folders/1gGPWHjZSF0Z22fus_yRrX_aq3zKws5Bp?usp=drive_link",
     "3": "https://drive.google.com/drive/folders/1fIZRxNrGmz5BwzNjbCsLdHfOHRK9MU1e?usp=drive_link",
     "4": "https://drive.google.com/drive/folders/17Ga5lrRQ-d8aLEOhZ24qZ7vWL8bXUpY1?usp=drive_link"
-}
-
-PERSONA_RULES = {
-    "Study Buddy": "You are 'Alex', a supportive senior. VIBE: Positive, emojis. GOAL: Help the student.",
-    "The Professor": "You are Professor Sharma. VIBE: Professional, precise. GOAL: Provide accurate info.",
-    "The Bro": "You are 'Sam', the chillest guy. VIBE: Slang, casual. GOAL: Quick answers.",
-    "ELI5": "Explain like I'm 5. VIBE: Simple analogies."
 }
 
 class ChatRequest(BaseModel):
@@ -82,17 +53,12 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
     try:
-        year = str(request.year) if str(request.year) in DATABASE else "1"
-        drive_link = DATABASE[year]
-        persona = PERSONA_RULES.get(request.mode, PERSONA_RULES["Study Buddy"])
+        # LOGGING TO PROVE THE CODE IS RUNNING
+        print(f"📩 Incoming Request: {request.message} for Year {request.year}")
         
-        system_prompt = (
-            f"{persona}\n\n"
-            f"OFFICIAL DRIVE LINK: {drive_link}\n"
-            "PROTOCOL: If asked for files, share the Drive Link. If asked for info, answer from context."
-        )
-
-        # 5. CONNECT TO PINECONE
+        year = str(request.year) if str(request.year) in DATABASE else "1"
+        
+        # CONNECT TO PINECONE
         pc = Pinecone(api_key=PINECONE_API_KEY)
         pinecone_index = pc.Index(INDEX_NAME)
         vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
@@ -107,7 +73,6 @@ def chat_endpoint(request: ChatRequest):
         query_engine = index.as_query_engine(
             similarity_top_k=5, 
             filters=MetadataFilters(filters=[ExactMatchFilter(key="year", value=year)]),
-            system_prompt=system_prompt,
             embed_model=embed_model # <--- This ensures the query doesn't use 004
         )
         
@@ -116,11 +81,11 @@ def chat_endpoint(request: ChatRequest):
 
     except Exception as e:
         print(f"❌ CHAT CRASH LOG: {e}")
-        return {"response": "My brain is having a hiccup! Try again in a sec. 🤖"}
+        return {"response": "My brain is having a hiccup! Please try again in a sec. 🤖"}
 
 @app.get("/")
 def home():
-    return {"status": "Active", "message": "SERVER.PY IS RUNNING ✅"}
+    return {"status": "Active", "message": "SERVER LIVE WITH FIXED EMBEDDINGS ✅"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=10000)
