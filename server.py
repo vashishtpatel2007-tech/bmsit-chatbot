@@ -21,28 +21,32 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("INDEX_NAME", "bmsit-chatbot")
 
-# 2. CONFIGURE AI (THE FIX)
-# We are printing this so we can prove it's running in the Render logs
-print("🚀 [CRITICAL UPDATE] SERVER STARTING WITH MODELS/EMBEDDING-001")
+# 2. CONFIGURE AI (EXPLICIT OVERRIDE)
+print("🚀 [CRITICAL UPDATE] FORCING MODELS/EMBEDDING-001 INTO ALL ENGINES")
 
 try:
-    # Use embedding-001 strictly to avoid the 404 error
+    # We define this strictly to avoid the 404 error
     embed_model = GoogleGenAIEmbedding(model="models/embedding-001", api_key=GOOGLE_API_KEY)
     llm = GoogleGenAI(model="models/gemini-2.0-flash", api_key=GOOGLE_API_KEY)
+    
+    # Global settings as backup
     Settings.embed_model = embed_model
     Settings.llm = llm
 except Exception as e:
     print(f"❌ AI CONFIG ERROR: {e}")
 
-# 3. INITIALIZE FIREBASE (Fixing the previous crash)
+# 3. INITIALIZE FIREBASE (Safety-First Mode)
 if not firebase_admin._apps:
     try:
-        # Assumes firebase_key.json is in your root folder
-        cred = credentials.Certificate("firebase_key.json")
-        firebase_admin.initialize_app(cred)
-        print("🔥 Firebase Initialized Successfully")
+        # Check if file exists to prevent the 'No such file' crash
+        if os.path.exists("firebase_key.json"):
+            cred = credentials.Certificate("firebase_key.json")
+            firebase_admin.initialize_app(cred)
+            print("🔥 Firebase Initialized Successfully")
+        else:
+            print("⚠️ firebase_key.json NOT FOUND. Chat logs will not be saved, but bot will work.")
     except Exception as e:
-        print(f"⚠️ Firebase Init Warning (Optional): {e}")
+        print(f"⚠️ Firebase Warning: {e}")
 
 # 4. INITIALIZE APP
 app = FastAPI()
@@ -88,15 +92,23 @@ def chat_endpoint(request: ChatRequest):
             "PROTOCOL: If asked for files, share the Drive Link. If asked for info, answer from context."
         )
 
+        # 5. CONNECT TO PINECONE
         pc = Pinecone(api_key=PINECONE_API_KEY)
         pinecone_index = pc.Index(INDEX_NAME)
         vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
-        index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+        
+        # --- THE FIX: Pass embed_model EXPLICITLY to the Index ---
+        index = VectorStoreIndex.from_vector_store(
+            vector_store=vector_store,
+            embed_model=embed_model # <--- This kills the ghost
+        )
 
+        # --- THE FIX: Pass embed_model EXPLICITLY to the Query Engine ---
         query_engine = index.as_query_engine(
             similarity_top_k=5, 
             filters=MetadataFilters(filters=[ExactMatchFilter(key="year", value=year)]),
-            system_prompt=system_prompt
+            system_prompt=system_prompt,
+            embed_model=embed_model # <--- This ensures the query doesn't use 004
         )
         
         response = query_engine.query(request.message)
