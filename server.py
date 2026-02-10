@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
-# --- LlamaIndex Imports (GEMINI 2.0 VERSION) ---
+# --- LlamaIndex Imports ---
 from pinecone import Pinecone
 from llama_index.core import VectorStoreIndex, Settings
 from llama_index.vector_stores.pinecone import PineconeVectorStore
@@ -19,11 +19,11 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("INDEX_NAME", "bmsit-chatbot")
 
-# 2. CONFIGURE AI (GEMINI 2.0)
-print("🚀 STARTING SERVER WITH GEMINI 2.0 FLASH")
+# 2. CONFIGURE AI (GEMINI 2.0 FLASH)
+print("🚀 STARTING SERVER: GEMINI 2.0")
 
 try:
-    # Using the models explicitly found in your list
+    # 768 Dimensions to match your Index
     embed_model = GoogleGenAIEmbedding(model="models/text-embedding-004", api_key=GOOGLE_API_KEY)
     llm = GoogleGenAI(model="models/gemini-2.0-flash", api_key=GOOGLE_API_KEY)
     
@@ -37,17 +37,16 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 DATABASE = {
-    "1": "https://drive.google.com/drive/folders/1Yv-tfstUnQytvhvdLP02j6IDiolovIWI?usp=drive_link",
-    "2": "https://drive.google.com/drive/folders/1gGPWHjZSF0Z22fus_yRrX_aq3zKws5Bp?usp=drive_link",
-    "3": "https://drive.google.com/drive/folders/1fIZRxNrGmz5BwzNjbCsLdHfOHRK9MU1e?usp=drive_link",
-    "4": "https://drive.google.com/drive/folders/17Ga5lrRQ-d8aLEOhZ24qZ7vWL8bXUpY1?usp=drive_link"
+    "1": "https://drive.google.com/drive/folders/1Yv-tfstUnQytvhvdLP02j6IDiolovIWI",
+    "2": "https://drive.google.com/drive/folders/1gGPWHjZSF0Z22fus_yRrX_aq3zKws5Bp",
+    "3": "https://drive.google.com/drive/folders/1fIZRxNrGmz5BwzNjbCsLdHfOHRK9MU1e",
+    "4": "https://drive.google.com/drive/folders/17Ga5lrRQ-d8aLEOhZ24qZ7vWL8bXUpY1"
 }
 
-# 🎭 MODES
 PERSONAS = {
     "Study Buddy": "You are 'Alex', an energetic BMSIT senior. VIBE: Positive, emojis. 🚀",
-    "The Professor": "You are Professor Sharma. VIBE: Formal, academic, precise. No slang.",
-    "The Bro": "You are 'Sam', the campus legend. VIBE: Casual, chill, uses slang (fam, bet, dw). 🕶️",
+    "The Professor": "You are Professor Sharma. VIBE: Formal, academic, precise.",
+    "The Bro": "You are 'Sam', the campus legend. VIBE: Casual, slang (fam, bet). 🕶️",
     "ELI5": "You are a patient tutor. VIBE: Simple analogies for a 5-year-old."
 }
 
@@ -59,20 +58,17 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
     try:
-        print(f"📩 Gemini 2.0 Request: {request.message} (Year {request.year})")
-        
         year = str(request.year) if str(request.year) in DATABASE else "1"
         drive_link = DATABASE[year]
         persona = PERSONAS.get(request.mode, PERSONAS["Study Buddy"])
         
         system_prompt = f"{persona}\n\nDRIVE: {drive_link}\nIf asked for files, share the link."
 
-        # 4. CONNECT TO PINECONE
+        # 4. CONNECT TO BRAIN
         pc = Pinecone(api_key=PINECONE_API_KEY)
         pinecone_index = pc.Index(INDEX_NAME)
         vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
         
-        # EXPLICITLY pass the Gemini 2.0 models
         index = VectorStoreIndex.from_vector_store(
             vector_store=vector_store,
             embed_model=embed_model
@@ -94,7 +90,7 @@ def chat_endpoint(request: ChatRequest):
 
 @app.get("/")
 def home():
-    return {"status": "Online", "message": "GEMINI 2.0 BACKEND ACTIVE ✅"}
+    return {"status": "Online", "message": "BMSIT BOT ACTIVE ✅"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=10000)
