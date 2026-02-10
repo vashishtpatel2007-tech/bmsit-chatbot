@@ -7,26 +7,27 @@ import uvicorn
 
 # --- LlamaIndex Imports (OPENAI VERSION) ---
 from pinecone import Pinecone
-from llama_index.core import VectorStoreIndex, Settings, PromptTemplate
+from llama_index.core import VectorStoreIndex, Settings
 from llama_index.vector_stores.pinecone import PineconeVectorStore
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core.vector_stores import MetadataFilters, ExactMatchFilter
 
-# 1. LOAD KEYS
+# 1. LOAD KEYS (Securely from Render Environment)
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("INDEX_NAME", "bmsit-chatbot")
 
-# 2. CONFIGURE AI (STABLE OPENAI)
-print("🚀 MIGRATION COMPLETE: RUNNING GPT-4o-MINI")
+# 2. CONFIGURE AI
+print("🚀 STARTING SERVER: RUNNING OPENAI GPT-4o-MINI")
 
 try:
-    # Industry standard stable models
+    # Stable, fast, and cheap models
     embed_model = OpenAIEmbedding(model="text-embedding-3-small", api_key=OPENAI_API_KEY)
     llm = OpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY)
     
+    # Set Global Defaults
     Settings.embed_model = embed_model
     Settings.llm = llm
 except Exception as e:
@@ -43,28 +44,12 @@ DATABASE = {
     "4": "https://drive.google.com/drive/folders/17Ga5lrRQ-d8aLEOhZ24qZ7vWL8bXUpY1?usp=drive_link"
 }
 
-# 🎭 ALL MODES RESTORED IN DETAIL
+# 🎭 MODES
 PERSONAS = {
-    "Study Buddy": (
-        "You are 'Alex', an energetic and super-supportive BMSIT senior. "
-        "VIBE: Positive, encouraging, high energy! Use emojis like 🚀, ✨, 📚. "
-        "GOAL: Make the student feel confident and capable."
-    ),
-    "The Professor": (
-        "You are Professor Sharma, a distinguished academic at BMSIT. "
-        "VIBE: Formal, helpful, professional, and very precise. "
-        "GOAL: Provide high-quality, technically accurate information. No slang."
-    ),
-    "The Bro": (
-        "You are 'Sam', the chillest guy on the BMSIT campus. "
-        "VIBE: Casual, uses slang (fam, bet, easy scene, dw). "
-        "GOAL: Give the answer straight with a relaxed vibe. 🕶️"
-    ),
-    "ELI5": (
-        "You are a patient BMSIT Tutor. "
-        "VIBE: Very gentle, slow, and extremely clear. "
-        "GOAL: Explain complex engineering concepts using simple analogies for a 5-year-old."
-    )
+    "Study Buddy": "You are 'Alex', an energetic BMSIT senior. VIBE: Positive, supportive, emojis. 🚀",
+    "The Professor": "You are Professor Sharma. VIBE: Formal, academic, precise. No slang.",
+    "The Bro": "You are 'Sam', the campus legend. VIBE: Casual, chill, uses slang (fam, bet, dw). 🕶️",
+    "ELI5": "You are a patient tutor. VIBE: Explain hard concepts simply using analogies for a 5-year-old."
 }
 
 class ChatRequest(BaseModel):
@@ -75,18 +60,17 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):
     try:
-        print(f"📩 OpenAI Request: {request.message} (Mode: {request.mode}, Year: {request.year})")
+        print(f"📩 Request: {request.message} (Mode: {request.mode}, Year: {request.year})")
         
         year = str(request.year) if str(request.year) in DATABASE else "1"
         drive_link = DATABASE[year]
-        persona_rule = PERSONAS.get(request.mode, PERSONAS["Study Buddy"])
+        persona = PERSONAS.get(request.mode, PERSONAS["Study Buddy"])
         
         system_prompt = (
-            f"{persona_rule}\n\n"
-            f"You are assisting a Year {year} student.\n"
-            f"BMSIT DRIVE RESOURCES: {drive_link}\n\n"
-            "If the user asks for notes, syllabus, or files, give them the Drive link. "
-            "Otherwise, answer based on the context provided."
+            f"{persona}\n\n"
+            f"You are helping a Year {year} student.\n"
+            f"OFFICIAL DRIVE LINK: {drive_link}\n"
+            "If asked for files/notes/syllabus, give the link. Otherwise, answer from context."
         )
 
         # 4. CONNECT TO PINECONE
@@ -110,12 +94,12 @@ def chat_endpoint(request: ChatRequest):
         return {"response": str(response)}
 
     except Exception as e:
-        print(f"❌ CHAT CRASH: {e}")
-        return {"response": "System maintenance. Give me a minute! 🤖"}
+        print(f"❌ CHAT ERROR: {e}")
+        return {"response": "System update in progress. Try again! 🤖"}
 
 @app.get("/")
 def home():
-    return {"status": "Online", "message": "OPENAI BMSIT-BOT ACTIVE ✅"}
+    return {"status": "Online", "message": "OPENAI VERSION ACTIVE ✅"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=10000)
