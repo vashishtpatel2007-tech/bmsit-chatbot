@@ -44,16 +44,17 @@ if not GOOGLE_API_KEY or not PINECONE_API_KEY or not LLAMA_CLOUD_API_KEY:
 print("⚙️ configuring AI (Universal Vision Mode)...")
 
 try:
-    embed_model = GoogleGenAIEmbedding(model="models/text-embedding-004", api_key=GOOGLE_API_KEY)
+    # FIXED: Switched to 'embedding-001' to fix 404 error
+    embed_model = GoogleGenAIEmbedding(model="models/embedding-001", api_key=GOOGLE_API_KEY)
     llm = GoogleGenAI(model="models/gemini-2.0-flash", api_key=GOOGLE_API_KEY)
     Settings.embed_model = embed_model
     Settings.llm = llm
     
-    # Configure Parser (Updated to fix Warning)
+    # Configure Parser
     parser = LlamaParse(
         api_key=LLAMA_CLOUD_API_KEY,
         result_type="text",
-        system_prompt=UNIVERSAL_INSTRUCTION, # <--- Renamed from 'parsing_instruction'
+        system_prompt=UNIVERSAL_INSTRUCTION, 
         premium_mode=True,
         verbose=True
     )
@@ -79,6 +80,7 @@ def update_database():
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
     try:
+        # Assumes credentials.json is created by GitHub Actions
         creds = Credentials.from_service_account_file("credentials.json")
         service = build('drive', 'v3', credentials=creds)
     except Exception as e:
@@ -120,7 +122,6 @@ def update_database():
                         parsed_results = parser.load_data(local_path)
                         
                         for doc in parsed_results:
-                            # --- CRASH FIX START ---
                             # Instead of editing the locked 'doc.text', we create a NEW Document
                             combined_text = doc.text + f"\n\n[OFFICIAL DOCUMENT LINK]: {web_link}"
                             
@@ -133,7 +134,6 @@ def update_database():
                             # Create a fresh, unlocked document
                             new_doc = Document(text=combined_text, metadata=new_metadata)
                             documents_to_upload.append(new_doc)
-                            # --- CRASH FIX END ---
 
                         os.remove(local_path)
                         
