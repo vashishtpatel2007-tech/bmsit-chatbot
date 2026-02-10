@@ -35,7 +35,7 @@ DATABASE = {
 # 2. CONFIGURE AI
 print("⚙️ Setting up Gemini 2.0...")
 try:
-    embed_model = GoogleGenAIEmbedding(model="models/text-embedding-004", api_key=GOOGLE_API_KEY)
+    embed_model = GoogleGenAIEmbedding(model="models/embedding-001", api_key=GOOGLE_API_KEY)
     llm = GoogleGenAI(model="models/gemini-2.0-flash", api_key=GOOGLE_API_KEY)
     Settings.embed_model = embed_model
     Settings.llm = llm
