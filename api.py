@@ -35,6 +35,7 @@ DATABASE = {
 # 2. CONFIGURE AI
 print("⚙️ Setting up Gemini 2.0...")
 try:
+    # FIXED: Switched to 'embedding-001' to fix 404 error
     embed_model = GoogleGenAIEmbedding(model="models/embedding-001", api_key=GOOGLE_API_KEY)
     llm = GoogleGenAI(model="models/gemini-2.0-flash", api_key=GOOGLE_API_KEY)
     Settings.embed_model = embed_model
@@ -55,8 +56,6 @@ app.add_middleware(
 
 # ==============================================================================
 # ✨ PERSONA RULES (REFINED)
-# ------------------------------------------------------------------------------
-# I removed the "Strict" rule from the Professor that was causing him to refuse requests.
 # ==============================================================================
 PERSONA_RULES = {
     "Study Buddy": (
