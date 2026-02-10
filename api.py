@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+print("📢 SANITY CHECK: I AM RUNNING THE NEW CODE WITH EMBEDDING-001")
 
 # --- IMPORTS ---
 from pinecone import Pinecone
